@@ -4,9 +4,9 @@ H100-Optimized Training Pipeline for Maximum Performance
 Optimizations:
 - bfloat16 native precision (H100 optimized)
 - Flash Attention 2 (3-5x faster)
-- torch.compile() for 30% speedup
+- torch.compile(mode='reduce-overhead') for 15-25% speedup
 - Larger batch sizes (512-1024)
-- Longer sequences (2000-5000)
+- Longer sequences (1200+)
 - All data preloaded to GPU memory
 - Profit-weighted aggressive loss
 - Gradient checkpointing for memory efficiency
@@ -316,9 +316,10 @@ class H100Trainer:
         # Compile models for speedup (if available)
         if self.use_compile and hasattr(torch, 'compile'):
             logger.info("   Compiling models with torch.compile()...")
-            regime_detector = torch.compile(regime_detector, mode='max-autotune')
+            # Use 'reduce-overhead' instead of 'max-autotune' to avoid CUDA Graphs tensor reuse issues
+            regime_detector = torch.compile(regime_detector, mode='reduce-overhead')
             for i, model in enumerate(specialized_models):
-                specialized_models[i] = torch.compile(model, mode='max-autotune')
+                specialized_models[i] = torch.compile(model, mode='reduce-overhead')
 
         total_params = sum(p.numel() for p in ensemble.parameters())
         logger.info(f"   Total parameters: {total_params:,}")
