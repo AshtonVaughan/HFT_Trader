@@ -262,9 +262,18 @@ class EnhancedTrainer:
                 with autocast(enabled=self.use_amp):
                     outputs = model(features)
 
-                    loss_dir = criterion_direction(outputs['direction_logits'], target_signs)
-                    loss_mag = criterion_magnitude(outputs['magnitude'].squeeze(), targets)
-                    loss = (loss_dir + 0.5 * loss_mag) / self.accumulation_steps
+                    # Handle different output formats
+                    if isinstance(outputs, tuple):
+                        # RegimeDetector returns (regime_logits, volatility)
+                        regime_logits, volatility = outputs
+                        loss_regime = criterion_direction(regime_logits, regimes)
+                        loss_vol = criterion_magnitude(volatility.squeeze(), targets.abs())
+                        loss = (loss_regime + 0.3 * loss_vol) / self.accumulation_steps
+                    else:
+                        # Predictors return dict with direction_logits and magnitude
+                        loss_dir = criterion_direction(outputs['direction_logits'], target_signs)
+                        loss_mag = criterion_magnitude(outputs['magnitude'].squeeze(), targets)
+                        loss = (loss_dir + 0.5 * loss_mag) / self.accumulation_steps
 
                 # Backward pass with gradient scaling
                 if self.use_amp:
