@@ -145,6 +145,10 @@ class H100Trainer:
 
         # 2. Create dataloaders with H100-optimized settings
         logger.info("\n2. Creating H100-optimized dataloaders...")
+
+        # Use smaller batch size for val/test to ensure at least 1 batch
+        val_test_batch_size = min(self.batch_size, 256)  # Max 256 for val/test
+
         train_loader, val_loader, test_loader = create_dataloaders(
             train_df=train_df,
             val_df=val_df,
@@ -154,6 +158,19 @@ class H100Trainer:
             num_workers=8,  # More workers for H100
             pin_memory=True
         )
+
+        # Create separate val/test loaders with smaller batch size
+        if len(val_loader) == 0 or len(test_loader) == 0:
+            logger.info(f"   Creating separate val/test loaders with batch_size={val_test_batch_size}")
+            _, val_loader, test_loader = create_dataloaders(
+                train_df=train_df,
+                val_df=val_df,
+                test_df=test_df,
+                batch_size=val_test_batch_size,
+                sequence_length=self.sequence_length,
+                num_workers=8,
+                pin_memory=True
+            )
 
         feature_dim = train_loader.dataset.get_feature_dim()
         data_load_time = time.time() - start_time
