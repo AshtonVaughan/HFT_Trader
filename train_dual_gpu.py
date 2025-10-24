@@ -9,6 +9,7 @@ Hybrid approach:
 import yaml
 import torch
 import torch.nn as nn
+import pandas as pd
 from torch.cuda.amp import autocast, GradScaler
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
@@ -18,8 +19,11 @@ from tqdm import tqdm
 import threading
 from queue import Queue
 
-from data.dataloader import create_dataloaders
-from models.model_builder import build_models
+from data.loaders.dataset import create_dataloaders
+from models.regime_detector.transformer_detector import RegimeDetector
+from models.predictors.specialized_models import LSTMPredictor, GRUPredictor, CNNLSTMPredictor
+from models.predictors.transformer_xl import TransformerXLPredictor
+from models.meta_learner.attention_meta_learner import AttentionMetaLearner, EnsemblePredictor
 from utils.logger import setup_logger, logger
 
 
@@ -81,14 +85,28 @@ class DualGPUTrainer:
 
         # 3. Build models
         logger.info("\n3. Building models...")
-        models_dict = build_models(
-            feature_dim=feature_dim,
-            config=self.config
+
+        # Don't move to device yet - will be assigned to specific GPUs later
+        regime_detector = RegimeDetector(
+            input_size=feature_dim,
+            d_model=256,
+            nhead=8,
+            num_layers=4,
+            dropout=0.2
         )
 
-        regime_detector = models_dict['regime_detector']
-        lstm, gru, cnn_lstm, transformer_xl = models_dict['specialized_models']
-        ensemble = models_dict['ensemble']
+        lstm = LSTMPredictor(input_size=feature_dim, hidden_size=256, num_layers=3)
+        gru = GRUPredictor(input_size=feature_dim, hidden_size=256, num_layers=3)
+        cnn_lstm = CNNLSTMPredictor(input_size=feature_dim, cnn_channels=[64, 128, 256], lstm_hidden_size=256)
+        transformer_xl = TransformerXLPredictor(input_size=feature_dim, d_model=256, nhead=8, num_layers=4)
+
+        specialized_models = [lstm, gru, cnn_lstm, transformer_xl]
+
+        meta_learner = AttentionMetaLearner(num_models=4, embedding_dim=128)
+        ensemble = EnsemblePredictor(regime_detector, specialized_models, meta_learner)
+
+        total_params = sum(p.numel() for p in ensemble.parameters())
+        logger.info(f"  Total parameters: {total_params:,}")
 
         # 4. Train Regime Detector on GPU 0
         logger.info("\n4. Training Regime Detector on GPU 0...")
@@ -439,5 +457,4 @@ def main():
 
 
 if __name__ == '__main__':
-    import pandas as pd
     main()
