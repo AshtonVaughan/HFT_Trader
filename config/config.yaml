@@ -122,6 +122,25 @@ dataloader:
   drop_last: true
   prefetch_factor: 2
 
+  # H100-optimized settings (for train_h100.py)
+  h100_batch_size: 512  # Larger batch size for H100 80GB
+  h100_sequence_length: 2000  # Longer context window
+
+# Training Settings
+training:
+  # Optimization
+  weight_decay: 1e-5
+  gradient_accumulation_steps: 2
+  use_amp: true  # Automatic Mixed Precision
+
+  # Early stopping
+  patience: 10
+
+  # H100-specific
+  use_bfloat16: true  # H100 native precision
+  use_compile: true   # torch.compile() for 30% speedup
+  fused_optimizer: true  # Fused AdamW for H100
+
 # Regime Classes
 regime_classes:
   - "trending_up"
