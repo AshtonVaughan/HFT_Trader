@@ -154,6 +154,17 @@ class EnhancedTrainer:
             pin_memory=True
         )
 
+        # Create smaller batch loaders for memory-intensive models (CNN-LSTM, Transformer-XL)
+        train_loader_small, val_loader_small, _ = create_dataloaders(
+            train_df=train_df,
+            val_df=val_df,
+            test_df=test_df,
+            batch_size=64,  # Reduced batch size for CNN models
+            sequence_length=self.config.get('dataloader', {}).get('sequence_length', 1000),
+            num_workers=4,
+            pin_memory=True
+        )
+
         feature_dim = train_loader.dataset.get_feature_dim()
 
         # Build models
@@ -173,14 +184,26 @@ class EnhancedTrainer:
 
         logger.info("\n5. Training specialized models...")
         for name, model in zip(['lstm', 'gru', 'cnn_lstm', 'transformer_xl'], models_dict['specialized_models']):
-            self._train_with_enhancements(
-                model=model,
-                train_loader=train_loader,
-                val_loader=val_loader,
-                model_name=name,
-                epochs=10,
-                lr=1e-4
-            )
+            # Use smaller batch size for memory-intensive models
+            if name in ['cnn_lstm', 'transformer_xl']:
+                logger.info(f"   Using reduced batch size (64) for {name}")
+                self._train_with_enhancements(
+                    model=model,
+                    train_loader=train_loader_small,
+                    val_loader=val_loader_small,
+                    model_name=name,
+                    epochs=10,
+                    lr=1e-4
+                )
+            else:
+                self._train_with_enhancements(
+                    model=model,
+                    train_loader=train_loader,
+                    val_loader=val_loader,
+                    model_name=name,
+                    epochs=10,
+                    lr=1e-4
+                )
 
         logger.info("\n6. Training meta-learner...")
         ensemble = models_dict['ensemble']
