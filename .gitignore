@@ -49,8 +49,9 @@ tensorboard_logs/
 # Data files (keep structure, ignore large files)
 raw_data/*.csv
 raw_data/*.parquet
-processed_data/*.parquet
-processed_data/*.pkl
+# Temporarily allow processed data for cloud training
+# processed_data/*.parquet
+# processed_data/*.pkl
 *.h5
 *.hdf5
 
