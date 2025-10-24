@@ -152,6 +152,18 @@ class DualGPUTrainer:
             lr=1e-4
         )
 
+        # Move LSTM and GRU to CPU to free GPU memory
+        logger.info("\n   Moving trained models to CPU to free GPU memory...")
+        lstm = lstm.cpu()
+        gru = gru.cpu()
+
+        # Clear GPU cache on both GPUs
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+        logger.info(f"   GPU 0 free memory: {torch.cuda.mem_get_info(0)[0] / 1024**3:.2f} GB")
+        logger.info(f"   GPU 1 free memory: {torch.cuda.mem_get_info(1)[0] / 1024**3:.2f} GB")
+
         # 6. Train CNN-LSTM with data parallelism (both GPUs)
         logger.info("\n6. Training CNN-LSTM with data parallelism (GPU 0+1)...")
         cnn_lstm = nn.DataParallel(cnn_lstm, device_ids=[0, 1]).to(self.device0)
@@ -164,6 +176,15 @@ class DualGPUTrainer:
             epochs=10,
             lr=1e-4
         )
+
+        # Move CNN-LSTM to CPU and clear GPU memory
+        logger.info("\n   Moving CNN-LSTM to CPU to free GPU memory...")
+        cnn_lstm = cnn_lstm.cpu()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+        logger.info(f"   GPU 0 free memory: {torch.cuda.mem_get_info(0)[0] / 1024**3:.2f} GB")
+        logger.info(f"   GPU 1 free memory: {torch.cuda.mem_get_info(1)[0] / 1024**3:.2f} GB")
 
         # 7. Train Transformer-XL with data parallelism (both GPUs)
         logger.info("\n7. Training Transformer-XL with data parallelism (GPU 0+1)...")
@@ -178,10 +199,19 @@ class DualGPUTrainer:
             lr=1e-4
         )
 
+        # Move Transformer-XL to CPU and clear GPU memory
+        logger.info("\n   Moving Transformer-XL to CPU to free GPU memory...")
+        transformer_xl = transformer_xl.cpu()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+        logger.info(f"   GPU 0 free memory: {torch.cuda.mem_get_info(0)[0] / 1024**3:.2f} GB")
+        logger.info(f"   GPU 1 free memory: {torch.cuda.mem_get_info(1)[0] / 1024**3:.2f} GB")
+
         # 8. Train Ensemble Meta-Learner on GPU 0
         logger.info("\n8. Training Ensemble Meta-Learner on GPU 0...")
 
-        # Load trained specialist models
+        # Load trained specialist models from checkpoints
         lstm.load_state_dict(torch.load('checkpoints/lstm_best.pth'))
         gru.load_state_dict(torch.load('checkpoints/gru_best.pth'))
 
