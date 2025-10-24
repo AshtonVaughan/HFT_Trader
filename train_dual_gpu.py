@@ -164,13 +164,25 @@ class DualGPUTrainer:
         logger.info(f"   GPU 0 free memory: {torch.cuda.mem_get_info(0)[0] / 1024**3:.2f} GB")
         logger.info(f"   GPU 1 free memory: {torch.cuda.mem_get_info(1)[0] / 1024**3:.2f} GB")
 
-        # 6. Train CNN-LSTM with data parallelism (both GPUs)
-        logger.info("\n6. Training CNN-LSTM with data parallelism (GPU 0+1)...")
-        cnn_lstm = nn.DataParallel(cnn_lstm, device_ids=[0, 1]).to(self.device0)
+        # 6. Train CNN-LSTM on GPU 0 with smaller batch size
+        logger.info("\n6. Training CNN-LSTM on GPU 0 (batch_size=64)...")
+
+        # Create smaller batch loader for CNN-LSTM
+        train_loader_cnn, val_loader_cnn, _ = create_dataloaders(
+            train_df=train_df,
+            val_df=val_df,
+            test_df=test_df,
+            batch_size=64,  # Reduced for CNN-LSTM
+            sequence_length=self.config.get('dataloader', {}).get('sequence_length', 1000),
+            num_workers=4,
+            pin_memory=True
+        )
+
+        cnn_lstm = cnn_lstm.to(self.device0)
         self._train_single_gpu(
             model=cnn_lstm,
-            train_loader=train_loader,
-            val_loader=val_loader,
+            train_loader=train_loader_cnn,
+            val_loader=val_loader_cnn,
             model_name='cnn_lstm',
             device=self.device0,
             epochs=10,
@@ -186,13 +198,25 @@ class DualGPUTrainer:
         logger.info(f"   GPU 0 free memory: {torch.cuda.mem_get_info(0)[0] / 1024**3:.2f} GB")
         logger.info(f"   GPU 1 free memory: {torch.cuda.mem_get_info(1)[0] / 1024**3:.2f} GB")
 
-        # 7. Train Transformer-XL with data parallelism (both GPUs)
-        logger.info("\n7. Training Transformer-XL with data parallelism (GPU 0+1)...")
-        transformer_xl = nn.DataParallel(transformer_xl, device_ids=[0, 1]).to(self.device0)
+        # 7. Train Transformer-XL on GPU 0 with even smaller batch size
+        logger.info("\n7. Training Transformer-XL on GPU 0 (batch_size=32)...")
+
+        # Create even smaller batch loader for Transformer-XL
+        train_loader_txl, val_loader_txl, _ = create_dataloaders(
+            train_df=train_df,
+            val_df=val_df,
+            test_df=test_df,
+            batch_size=32,  # Very small for Transformer-XL memory mechanism
+            sequence_length=self.config.get('dataloader', {}).get('sequence_length', 1000),
+            num_workers=4,
+            pin_memory=True
+        )
+
+        transformer_xl = transformer_xl.to(self.device0)
         self._train_single_gpu(
             model=transformer_xl,
-            train_loader=train_loader,
-            val_loader=val_loader,
+            train_loader=train_loader_txl,
+            val_loader=val_loader_txl,
             model_name='transformer_xl',
             device=self.device0,
             epochs=10,
@@ -215,33 +239,24 @@ class DualGPUTrainer:
         lstm.load_state_dict(torch.load('checkpoints/lstm_best.pth'))
         gru.load_state_dict(torch.load('checkpoints/gru_best.pth'))
 
-        # Unwrap DataParallel models
-        if isinstance(cnn_lstm, nn.DataParallel):
-            cnn_lstm_single = cnn_lstm.module
-        else:
-            cnn_lstm_single = cnn_lstm
-        cnn_lstm_single.load_state_dict(torch.load('checkpoints/cnn_lstm_best.pth'))
-
-        if isinstance(transformer_xl, nn.DataParallel):
-            transformer_xl_single = transformer_xl.module
-        else:
-            transformer_xl_single = transformer_xl
-        transformer_xl_single.load_state_dict(torch.load('checkpoints/transformer_xl_best.pth'))
+        # Load CNN-LSTM and Transformer-XL checkpoints (no DataParallel unwrapping needed)
+        cnn_lstm.load_state_dict(torch.load('checkpoints/cnn_lstm_best.pth'))
+        transformer_xl.load_state_dict(torch.load('checkpoints/transformer_xl_best.pth'))
 
         # Move all to GPU 0 for ensemble
         lstm = lstm.to(self.device0)
         gru = gru.to(self.device0)
-        cnn_lstm_single = cnn_lstm_single.to(self.device0)
-        transformer_xl_single = transformer_xl_single.to(self.device0)
+        cnn_lstm = cnn_lstm.to(self.device0)
+        transformer_xl = transformer_xl.to(self.device0)
         ensemble = ensemble.to(self.device0)
 
         # Freeze specialist models
-        for model in [lstm, gru, cnn_lstm_single, transformer_xl_single]:
+        for model in [lstm, gru, cnn_lstm, transformer_xl]:
             for param in model.parameters():
                 param.requires_grad = False
 
         # Update ensemble's specialist models
-        ensemble.specialized_models = nn.ModuleList([lstm, gru, cnn_lstm_single, transformer_xl_single])
+        ensemble.specialized_models = nn.ModuleList([lstm, gru, cnn_lstm, transformer_xl])
 
         self._train_single_gpu(
             model=ensemble,
