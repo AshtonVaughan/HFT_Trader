@@ -169,7 +169,7 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        drop_last=False
+        drop_last=True  # Fixed: Drop incomplete batches for Transformer-XL memory consistency
     )
 
     test_loader = DataLoader(
@@ -178,7 +178,7 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        drop_last=False
+        drop_last=True  # Fixed: Drop incomplete batches for Transformer-XL memory consistency
     )
 
     logger.info(f"   Train batches: {len(train_loader)}")
