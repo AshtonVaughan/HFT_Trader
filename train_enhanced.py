@@ -348,18 +348,32 @@ class EnhancedTrainer:
                 features = features.to(self.device)
                 targets = targets.to(self.device)
                 target_signs = target_signs.to(self.device)
+                regimes = regimes.to(self.device)
 
                 outputs = model(features)
 
-                loss_dir = criterion_direction(outputs['direction_logits'], target_signs)
-                loss_mag = criterion_magnitude(outputs['magnitude'].squeeze(), targets)
-                loss = loss_dir + 0.5 * loss_mag
+                # Handle different output formats
+                if isinstance(outputs, tuple):
+                    # RegimeDetector returns (regime_logits, volatility)
+                    regime_logits, volatility = outputs
+                    loss_regime = criterion_direction(regime_logits, regimes)
+                    loss_vol = criterion_magnitude(volatility.squeeze(), targets.abs())
+                    loss = loss_regime + 0.3 * loss_vol
+
+                    # Accuracy for regime classification
+                    preds = torch.argmax(regime_logits, dim=1)
+                    correct += (preds == regimes).sum().item()
+                else:
+                    # Predictors return dict with direction_logits and magnitude
+                    loss_dir = criterion_direction(outputs['direction_logits'], target_signs)
+                    loss_mag = criterion_magnitude(outputs['magnitude'].squeeze(), targets)
+                    loss = loss_dir + 0.5 * loss_mag
+
+                    # Accuracy for direction classification
+                    preds = torch.argmax(outputs['direction_logits'], dim=1)
+                    correct += (preds == target_signs).sum().item()
 
                 val_loss += loss.item()
-
-                # Accuracy
-                preds = torch.argmax(outputs['direction_logits'], dim=1)
-                correct += (preds == target_signs).sum().item()
                 total += target_signs.size(0)
 
         avg_val_loss = val_loss / len(val_loader)
