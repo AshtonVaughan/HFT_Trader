@@ -124,7 +124,7 @@ dataloader:
 
   # H100-optimized settings (for train_h100.py)
   h100_batch_size: 512  # Larger batch size for H100 80GB
-  h100_sequence_length: 2000  # Longer context window
+  h100_sequence_length: 1200  # Longer context window (1200 fits in val/test splits)
 
 # Training Settings
 training:
