@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Model checkpoints and training artifacts
+checkpoints/*.pth
+checkpoints/*.pt
+models/saved_models/*.pth
+models/saved_models/*.pt
+runs/
+tensorboard_logs/
+
+# Data files (keep structure, ignore large files)
+raw_data/*.csv
+raw_data/*.parquet
+processed_data/*.parquet
+processed_data/*.pkl
+*.h5
+*.hdf5
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+
+# Secrets
+.env
+credentials.json
+api_keys.txt
+config/secrets.yaml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Large binary files
+*.bin
+*.dat

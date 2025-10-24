@@ -1,0 +1,152 @@
+# HFT_Trader Configuration
+
+# Data Collection
+data_collection:
+  primary_pair: "EURUSD"
+  start_date: "2024-01-01"  # 1 year of data
+  end_date: "2025-10-24"
+
+  # Additional pairs for context
+  cross_pairs:
+    - "EURGBP"
+    - "GBPUSD"
+  context_instruments:
+    - "DX-Y.NYB"  # Dollar Index
+    - "GC=F"      # Gold Futures
+
+  # Data sources
+  sources:
+    tick_data: "dukascopy"  # dukascopy, truefx
+    ohlc_primary: "alphavantage"  # alphavantage (better intraday coverage)
+    ohlc_backup: "yahoo"    # yahoo (fallback)
+
+  # Alpha Vantage API key (get free key at https://www.alphavantage.co/support/#api-key)
+  alphavantage_api_key: "OGA3P77G2AL203T3"
+
+  # Storage paths
+  raw_data_dir: "raw_data"
+  processed_data_dir: "processed_data"
+
+# Timeframes
+timeframes:
+  primary: "1m"
+  additional:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+
+# Trading Sessions (all times in UTC)
+sessions:
+  asian:
+    start: "00:00"
+    end: "09:00"
+  london:
+    start: "08:00"
+    end: "17:00"
+  new_york:
+    start: "13:00"
+    end: "22:00"
+  # London/NY overlap: 13:00-17:00 UTC (most liquid)
+  focus_session:
+    start: "13:00"  # 8am EST
+    end: "17:00"    # 12pm EST
+
+# Feature Engineering
+features:
+  price_volume:
+    vwap_periods: [10, 20, 50, 100]
+    volume_periods: [10, 20, 50]
+    return_lags: [1, 5, 10, 30, 60]
+
+  technical_indicators:
+    rsi_periods: [14, 21]
+    atr_periods: [14]
+    bollinger_periods: [20]
+    bollinger_std: 2.0
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    stoch_periods: [14, 3, 3]
+    adx_period: 14
+
+  support_resistance:
+    lookback_bars: 100
+    num_levels: 5
+
+  correlation_windows: [50, 100, 200]
+
+# Data Preprocessing
+preprocessing:
+  # Train/Val/Test Split
+  train_pct: 0.70
+  val_pct: 0.15
+  test_pct: 0.15
+
+  # Scaling
+  scaler_type: "robust"  # robust, standard, minmax
+
+  # Cleaning
+  fill_method: "ffill"  # forward fill
+  max_gap_minutes: 5    # max acceptable data gap
+  remove_outliers: true
+  outlier_std_threshold: 5.0
+
+  # Regime Labeling
+  regime_detection:
+    trending_adx_threshold: 25
+    ranging_adx_threshold: 20
+    volatile_atr_percentile: 80
+
+# Data Augmentation
+augmentation:
+  enabled: true
+  noise_std: 0.0003  # 0.03 pips
+  spread_variation:
+    min_pips: 0.5
+    max_pips: 1.5
+  time_shift_max_bars: 10
+
+# GPU & Training
+hardware:
+  device: "cuda"  # cuda for GPU, cpu for CPU
+  mixed_precision: true  # FP16 training
+  num_workers: 4
+  pin_memory: true
+
+# DataLoader Settings
+dataloader:
+  batch_size: 256
+  sequence_length: 1000  # lookback window in bars
+  shuffle_train: true
+  drop_last: true
+  prefetch_factor: 2
+
+# Regime Classes
+regime_classes:
+  - "trending_up"
+  - "trending_down"
+  - "ranging"
+  - "volatile"
+
+# Risk Parameters (for future RL training)
+risk:
+  max_spread_pips: 1.5
+  max_slippage_pips: 0.5
+  commission_per_lot: 0.0  # USD (zero commission account)
+  stop_loss_atr_multiple: 1.5
+  take_profit_atr_multiple: 2.5
+  max_position_size: 0.02  # 2% of capital
+  min_confidence: 0.65
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "hft_trader.log"
+  console_output: true
+
+# Experiment Tracking
+mlflow:
+  enabled: false
+  tracking_uri: "mlruns"
+  experiment_name: "HFT_Trader"
