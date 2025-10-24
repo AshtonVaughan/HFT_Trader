@@ -154,12 +154,23 @@ class EnhancedTrainer:
             pin_memory=True
         )
 
-        # Create smaller batch loaders for memory-intensive models (CNN-LSTM, Transformer-XL)
+        # Create smaller batch loaders for memory-intensive models (CNN-LSTM)
         train_loader_small, val_loader_small, _ = create_dataloaders(
             train_df=train_df,
             val_df=val_df,
             test_df=test_df,
             batch_size=64,  # Reduced batch size for CNN models
+            sequence_length=self.config.get('dataloader', {}).get('sequence_length', 1000),
+            num_workers=4,
+            pin_memory=True
+        )
+
+        # Create even smaller batch loaders for Transformer-XL (memory mechanism)
+        train_loader_tiny, val_loader_tiny, _ = create_dataloaders(
+            train_df=train_df,
+            val_df=val_df,
+            test_df=test_df,
+            batch_size=32,  # Very small batch size for Transformer-XL
             sequence_length=self.config.get('dataloader', {}).get('sequence_length', 1000),
             num_workers=4,
             pin_memory=True
@@ -184,8 +195,21 @@ class EnhancedTrainer:
 
         logger.info("\n5. Training specialized models...")
         for name, model in zip(['lstm', 'gru', 'cnn_lstm', 'transformer_xl'], models_dict['specialized_models']):
-            # Use smaller batch size for memory-intensive models
-            if name in ['cnn_lstm', 'transformer_xl']:
+            # Clear GPU cache before each model
+            torch.cuda.empty_cache()
+
+            # Use appropriate batch size for each model
+            if name == 'transformer_xl':
+                logger.info(f"   Using reduced batch size (32) for {name}")
+                self._train_with_enhancements(
+                    model=model,
+                    train_loader=train_loader_tiny,
+                    val_loader=val_loader_tiny,
+                    model_name=name,
+                    epochs=10,
+                    lr=1e-4
+                )
+            elif name == 'cnn_lstm':
                 logger.info(f"   Using reduced batch size (64) for {name}")
                 self._train_with_enhancements(
                     model=model,
